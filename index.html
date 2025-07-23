@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Face Viewer</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 2em;
+            background-color: #161616;
+        }
+
+        #faceContainer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 600px;
+            gap: 1em;
+        }
+
+        button {
+            font-size: 1.5em;
+            padding: 0.5em 1em;
+            cursor: pointer;
+            background-color: #333333;
+            border: none;
+        }
+
+        #buttons {
+            height: 20%;
+            display: inline;
+        }
+
+        #faceCanvas {
+            width: 100%;
+        }
+
+        h1 {
+            color: aliceblue;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="buttons">
+        <button id="prevBtn" aria-label="Previous face">&lt;</button>
+        <button id="nextBtn" aria-label="Next face">&gt;</button>
+    </div>
+    <div id="faceContainer">
+        <canvas id="faceCanvas"></canvas>
+    </div>
+
+    <script>
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const faceCanvas = document.getElementById('faceCanvas');
+        const ctx = faceCanvas.getContext('2d');
+
+        let faceList = []; // Will hold objects: {imagePath, face}
+        let currentIndex = 0;
+        let fullImage = new Image();
+        let imageCache = {}; // Cache loaded images by path
+
+        // Load face data and prepare combined list
+        fetch('faces_data.json')
+            .then(res => res.json())
+            .then(data => {
+                // Flatten all faces from all images into one array
+                Object.entries(data).forEach(([imageName, faces]) => {
+                    faces.forEach(face => {
+                        faceList.push({
+                            imagePath: `images/${imageName}`,
+                            face: face
+                        });
+                    });
+                });
+
+                if (faceList.length > 0) {
+                    loadAndDrawFace(currentIndex);
+                }
+            });
+
+        function loadAndDrawFace(index) {
+            if (index < 0 || index >= faceList.length) return;
+            const { imagePath, face } = faceList[index];
+
+            // Load image or use cached if available
+            if (imageCache[imagePath]) {
+                drawFace(imageCache[imagePath], face);
+            } else {
+                fullImage = new Image();
+                fullImage.src = imagePath;
+                fullImage.onload = () => {
+                    imageCache[imagePath] = fullImage;
+                    drawFace(fullImage, face);
+                };
+                fullImage.onerror = () => {
+                    ctx.clearRect(0, 0, faceCanvas.width, faceCanvas.height);
+                    ctx.font = "16px sans-serif";
+                    ctx.fillText("Failed to load image", 10, 50);
+                };
+            }
+        }
+
+        function drawFace(img, face) {
+            // Set canvas size to face crop size
+            faceCanvas.width = Math.round(face.width);
+            faceCanvas.height = Math.round(face.height);
+
+            ctx.clearRect(0, 0, faceCanvas.width, faceCanvas.height);
+            ctx.drawImage(
+                img,
+                Math.round(face.x),
+                Math.round(face.y),
+                Math.round(face.width),
+                Math.round(face.height),
+                0,
+                0,
+                faceCanvas.width,
+                faceCanvas.height
+            );
+        }
+
+        prevBtn.addEventListener('click', () => {
+            if (faceList.length === 0) return;
+            currentIndex = (currentIndex - 1 + faceList.length) % faceList.length;
+            loadAndDrawFace(currentIndex);
+        });
+
+        nextBtn.addEventListener('click', () => {
+            if (faceList.length === 0) return;
+            currentIndex = (currentIndex + 1) % faceList.length;
+            loadAndDrawFace(currentIndex);
+        });
+    </script>
+</body>
+
+</html>
